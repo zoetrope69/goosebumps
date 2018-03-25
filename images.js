@@ -7,18 +7,35 @@ function randomNumberBetween(min, max) {
 const WIDTH = 339
 const HEIGHT = 500
 
-function createImage (keyword) {
-  return new Promise((resolve, reject) => {
-    const text = `${keyword}`
-    const randomImage = `https://loremflickr.com/${WIDTH}/${HEIGHT}/${encodeURIComponent(keyword)}/all?random=${randomNumberBetween(0, 20)}`
+const MAX_TEXT_LENGTH = 30
 
+function createImage (keyword, text) {
+  return new Promise((resolve, reject) => {
+    keyword = keyword.toLowerCase()
+    
+    if (text.length > MAX_TEXT_LENGTH) {
+      text = text.substring(0, MAX_TEXT_LENGTH) + '...'
+    }
+  
+    
+    const randomImage = `https://loremflickr.com/${WIDTH}/${HEIGHT}/${encodeURIComponent(keyword)}?random=${randomNumberBetween(0, 20)}`
+    const defaultImage = `https://loremflickr.com/${WIDTH}/${HEIGHT}/somethingthatwouldnevercomebackwithanything`
+    
     Promise.all([
+      jimp.read(defaultImage),
       jimp.read(randomImage),
       jimp.read('goosebumps-cover.png'),
       jimp.loadFont(jimp.FONT_SANS_16_WHITE)
     ]).then(loadedAssets => {
-      [loadedImage, goosebumpsImage, font] = loadedAssets
+      const [defaultImage, loadedImage, goosebumpsImage, font] = loadedAssets
+      
+      const comparisonBetweenImageAndDefaultImage = jimp.distance(defaultImage, loadedImage)
+      const isDefaultImage = comparisonBetweenImageAndDefaultImage <= 0.1
 
+      if (isDefaultImage) {
+        return reject(`No image found for keyword: ${keyword} (${comparisonBetweenImageAndDefaultImage})`)
+      }
+      
       const huePosition = randomNumberBetween(0, 360)
       const hueRotatedCover = goosebumpsImage.color([
         { apply: 'hue', params: [huePosition] }
@@ -26,10 +43,11 @@ function createImage (keyword) {
 
       const textPadMin = 30
       const textPadMax = 130
-      const maxText = 22
-      const textPosition = textPadMin + (textPadMax / (maxText / text.length))
+      const padPerCharacter = textPadMax / MAX_TEXT_LENGTH
+      const textPosition = textPadMin + ((MAX_TEXT_LENGTH - text.length) * padPerCharacter)
 
       const mergedImage = loadedImage
+        .posterize(6)
         .composite(hueRotatedCover, 0, 0)
 
       const textOnImage = mergedImage
