@@ -1,35 +1,26 @@
-const createImage = require('./images')
+const createImage = require('./js/images')
+const tootImage = require('./js/mastodon')
+const getRandomBookKeywordAndTitle = require('./js/bookTitles')
 const express = require('express')
 
 const app = express()
 
 app.get('/', (request, response) => {
-  response.sendStatus(200)
+  const link = '<a href="https://botsin.space/@goosebumps">@goosebumps@botsin.space</a>'
+  response.status(200).send(link);
 })
 
-app.get('/:keyword/:text', (request, response) => {
-  const { keyword, text } = request.params
-
-  if (!keyword || !text) {
-    console.error('No keyword/text sent')
-
-    response.status(500).send('No keyword/text sent')
-  }
-
-  createImage(keyword, text).then(b64String => {
-    const image = new Buffer(b64String.split(',')[1], 'base64');
-
-    response.writeHead(200, {
-      'Content-Type': 'image/png',
-      'Content-Length': image.length
-    })
-
-    response.end(image)
+app.get('/' + process.env.BOT_ENDPOINT, (request, response) => {
+  const { keyword, title } = getRandomBookKeywordAndTitle()
+  createImage(keyword, title).then(() => {
+    return tootImage(title)
+  })
+  .then(() => {
+    return response.status(200).send('sent a toot!');
   })
   .catch(error => {
-    console.error(error)
-
-    response.status(500).send(error)
+    console.error('error:', error);
+    return response.status(500).send(error);
   })
 })
 
